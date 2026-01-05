@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  backend:
+    build: ./app/backend
+    container_name: prompt_backend
+    ports:
+      - "8000:8000"
+    volumes:
+      # Mount the model file so we don't have to rebuild image to update model
+      - ./app/backend/bertopic_model.pkl:/app/bertopic_model.pkl
+    environment:
+      - MODEL_PATH=/app/bertopic_model.pkl
+
+  frontend:
+    build: ./app/frontend
+    container_name: prompt_frontend
+    ports:
+      - "8501:8501"
+    depends_on:
+      - backend
+    environment:
+      - BACKEND_URL=http://backend:8000/predict
