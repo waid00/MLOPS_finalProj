@@ -1,13 +1,26 @@
 import logging
+import numpy as np
+from pathlib import Path
+from typing import Dict, Any, List, Union
 from bertopic import BERTopic
 from sentence_transformers import SentenceTransformer
-from pathlib import Path
-import numpy as np
 
+# Configure logging
 logger = logging.getLogger(__name__)
 
 class TopicModelClassifier:
+    """
+    A wrapper class for the BERTopic model that provides hybrid classification capabilities.
+    
+    It combines the unsupervised ML model with a rule-based keyword override system
+    to ensure high precision for specific business categories.
+    """
+
     def __init__(self):
+        """
+        Initialize the classifier configuration and keyword maps.
+        Does not load the heavy model into memory until load_model() is called.
+        """
         self.model = None
         # FIX: Use absolute path relative to this file, not the command line CWD
         # This ensures tests run from root can still find the model in app/backend/
@@ -28,7 +41,7 @@ class TopicModelClassifier:
         }
         self.default_label = "General AI Assistant"
 
-        # Keyword Overrides
+        # Keyword Overrides for Hybrid Classification
         self.keyword_overrides = {
             "Coding & Development": [
                 "python", "javascript", "code", "script", "function", "css", "html", "java ", 
@@ -72,7 +85,13 @@ class TopicModelClassifier:
             ]
         }
 
-    def load_model(self):
+    def load_model(self) -> None:
+        """
+        Loads the BERTopic artifact and the SentenceTransformer embedding model from disk.
+        
+        Raises:
+            Exception: Logs error if model file is missing or corrupt.
+        """
         try:
             if self.model_path.exists():
                 logger.info(f"Loading model from {self.model_path}")
@@ -86,6 +105,15 @@ class TopicModelClassifier:
             logger.error(f"Failed to load model: {e}")
 
     def _map_topic_to_business_label(self, topic_id: int) -> str:
+        """
+        Maps an internal BERTopic integer ID to a human-readable business category.
+
+        Args:
+            topic_id (int): The cluster ID returned by BERTopic.
+
+        Returns:
+            str: The mapped business category or a cleaned version of the topic name.
+        """
         if topic_id == -1:
             return "Uncategorized / Noise"
         
@@ -113,7 +141,19 @@ class TopicModelClassifier:
         readable_name = ", ".join(clean_name.split('_')[1:4])
         return f"Topic: {readable_name}"
 
-    def predict(self, text: str):
+    def predict(self, text: str) -> Dict[str, Any]:
+        """
+        Predicts the topic for a given input text using a hybrid approach.
+
+        Args:
+            text (str): The user prompt to classify.
+
+        Returns:
+            dict: Contains topic_id, topic_label, topic_words, and topic_prob.
+        
+        Raises:
+            ValueError: If the model has not been loaded yet.
+        """
         if not self.model:
             raise ValueError("Model not initialized")
         

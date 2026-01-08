@@ -1,97 +1,99 @@
 import pytest
 import sys
-import os
 import platform
 import ctypes
+import logging
 from importlib.util import find_spec
+from pathlib import Path
 from fastapi.testclient import TestClient
 
-# --- WINDOWS DLL FIX START ---
-# This must run BEFORE importing app.backend.main to fix [WinError 1114]
+# Configure Logging for tests
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# --- WINDOWS DLL FIX (Pathlib Compliant) ---
 if platform.system() == "Windows":
     try:
-        if (spec := find_spec("torch")) and spec.origin:
-            dll_path = os.path.join(os.path.dirname(spec.origin), "lib", "c10.dll")
-            if os.path.exists(dll_path):
-                ctypes.CDLL(os.path.normpath(dll_path))
+        spec = find_spec("torch")
+        if spec and spec.origin:
+            # Use pathlib instead of os.path
+            dll_path = Path(spec.origin).parent / "lib" / "c10.dll"
+            if dll_path.exists():
+                ctypes.CDLL(str(dll_path))
     except Exception as e:
-        print(f"Warning: Attempted to pre-load c10.dll but failed: {e}")
-# --- WINDOWS DLL FIX END ---
+        logger.warning(f"Attempted to pre-load c10.dll but failed: {e}")
+# -------------------------------------------
 
-# --- PATH FIX START ---
-# Get absolute paths
-current_dir = os.path.dirname(os.path.abspath(__file__))
-root_dir = os.path.abspath(os.path.join(current_dir, '../..'))
-backend_dir = os.path.join(root_dir, 'app', 'backend')
+# --- PATH FIX (Pathlib Compliant) ---
+# Use pathlib to robustly find directories relative to this file
+current_dir = Path(__file__).resolve().parent
+root_dir = current_dir.parent.parent
+backend_dir = root_dir / "app" / "backend"
 
-# Add root directory to path
-if root_dir not in sys.path:
-    sys.path.append(root_dir)
-
-# Crucial: Add backend directory to path so 'import model' inside main.py works
-if backend_dir not in sys.path:
-    sys.path.append(backend_dir)
-# --- PATH FIX END ---
+# Convert to string for sys.path as it expects strings
+if str(root_dir) not in sys.path:
+    sys.path.append(str(root_dir))
+if str(backend_dir) not in sys.path:
+    sys.path.append(str(backend_dir))
+# ------------------------------------
 
 from app.backend.main import app
 
-client = TestClient(app)
-
-def test_health_check():
+@pytest.fixture(scope="module")
+def client():
     """
-    Verifies the API is running and reports model status.
+    Pytest fixture that initializes the TestClient.
+    Uses context manager to ensure startup events (model loading) trigger correctly.
+    """
+    with TestClient(app) as c:
+        yield c
+
+def test_health_check(client):
+    """
+    Verifies the API is running and that the model has been loaded into memory.
     """
     response = client.get("/health")
     assert response.status_code == 200
     data = response.json()
     assert "status" in data
-    assert "model_loaded" in data
+    assert data["model_loaded"] is True
 
-def test_predict_coding_override():
+def test_predict_coding_override(client):
     """
-    Tests the 'Safety Net' logic. 
-    Input 'Write a python script' should force 'Coding & Development' 
-    regardless of the underlying ML cluster.
+    Verifies that the hybrid system correctly forces 'Coding & Development' 
+    for explicit Python prompts, regardless of ML confidence.
     """
     response = client.post("/predict", json={"text": "Write a python script to calculate pi"})
     
-    # If model isn't loaded (e.g. in CI without artifact), we expect 503.
-    # If loaded, we expect 200 and specific correct classification.
-    if response.status_code == 200:
-        data = response.json()
-        assert "topic_id" in data
-        assert data["topic_label"] == "Coding & Development"
-        # We expect high confidence due to the override logic
-        assert data["topic_prob"] >= 0.95
-    else:
-        assert response.status_code == 503
+    assert response.status_code == 200
+    data = response.json()
+    assert "topic_id" in data
+    assert data["topic_label"] == "Coding & Development"
+    assert data["topic_prob"] >= 0.95
 
-def test_predict_creative_writing_override():
+def test_predict_creative_writing_override(client):
     """
-    Tests another category to ensure the expanded keyword list works.
-    Input 'Write a poem' should trigger 'Creative Writing'.
+    Verifies that the hybrid system correctly forces 'Creative Writing' 
+    for poem/haiku requests.
     """
     response = client.post("/predict", json={"text": "Write a haiku about the ocean"})
     
-    if response.status_code == 200:
-        data = response.json()
-        assert data["topic_label"] == "Creative Writing"
-    else:
-        assert response.status_code == 503
+    assert response.status_code == 200
+    data = response.json()
+    assert data["topic_label"] == "Creative Writing"
 
-def test_predict_empty():
+def test_predict_empty(client):
     """
-    Verifies the API handles empty input without crashing.
+    Verifies the API handles empty string input gracefully without 500/503 errors.
     """
     response = client.post("/predict", json={"text": ""})
-    # The API allows empty text, but the model might return noise or Uncategorized
     assert response.status_code == 200 
     data = response.json()
-    assert "topic_label" in data
+    assert data["topic_label"] == "Uncategorized / Noise"
 
-def test_predict_invalid_json():
+def test_predict_invalid_json(client):
     """
-    Verifies Pydantic validation catches bad inputs.
+    Verifies that Pydantic validation correctly rejects malformed requests.
     """
     response = client.post("/predict", json={"wrong_field": "text"})
     assert response.status_code == 422
