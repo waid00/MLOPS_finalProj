@@ -16,9 +16,9 @@ def apply_windows_patch():
                 dll_path = Path(spec.origin).parent / "lib" / "c10.dll"
                 if dll_path.exists():
                     ctypes.CDLL(str(dll_path))
-                    print("Successfully pre-loaded c10.dll")
+                    logging.info("Successfully pre-loaded c10.dll")
         except Exception as e:
-            print(f"Warning: Failed to pre-load c10.dll: {e}")
+            logging.warning(f"Warning: Failed to pre-load c10.dll: {e}")
 
 apply_windows_patch()
 # --------------------------------------------------------------
@@ -152,7 +152,7 @@ def train_and_save(
     # Print info for user
     freq = topic_model.get_topic_info()
     logger.info(f"Training pipeline completed. Found {len(freq)-1} topics.")
-    print(freq.head(10))
+    logger.info("Top 10 Topics:\n" + str(freq.head(10)))
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train BERTopic model")

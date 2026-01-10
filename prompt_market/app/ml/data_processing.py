@@ -86,7 +86,7 @@ if __name__ == "__main__":
     # For testing the script independently
     df = load_data(DATA_URL)
     df_clean = preprocess_data(df)
-    print("EDA Stats:", get_eda_stats(df_clean))
+    logger.info(f"EDA Stats: {get_eda_stats(df_clean)}")
     
     # Save for reproducible training
     output_path = Path("processed_prompts.csv")
