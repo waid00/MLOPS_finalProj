@@ -14,7 +14,7 @@ The application follows a microservices architecture using Docker containers:
 
 - **ML Pipeline:** Offline training scripts that process data, train the model, and track experiments via MLflow.
 
-> [INSERT YOUR ARCHITECTURE DIAGRAM IMAGE HERE]
+![Architecture Diagram](assets/architecture.jpeg)
 
 ---
 
