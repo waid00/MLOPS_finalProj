@@ -1,3 +1,25 @@
+import platform
+import ctypes
+import logging
+from importlib.util import find_spec
+from pathlib import Path
+
+# --- WINDOWS DLL FIX ---
+# This must be run BEFORE importing bertopic or torch
+if platform.system() == "Windows":
+    try:
+        spec = find_spec("torch")
+        if spec and spec.origin:
+            dll_path = Path(spec.origin).parent / "lib" / "c10.dll"
+            if dll_path.exists():
+                ctypes.CDLL(str(dll_path))
+                print("Successfully pre-loaded c10.dll for Windows")
+    except Exception as e:
+        print(f"Warning: Failed to pre-load c10.dll: {e}")
+# -----------------------
+
+
+
 import mlflow
 import pandas as pd
 from bertopic import BERTopic

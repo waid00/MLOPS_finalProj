@@ -1,0 +1,15 @@
+artifact_uri: file:///C:/Users/david/Desktop/FinalProj/prompt_market/mlruns/326193266239417984/8302103e42fe44f38835711a9be97c8a/artifacts
+end_time: 1768055079497
+entry_point_name: ''
+experiment_id: '326193266239417984'
+lifecycle_stage: active
+run_id: 8302103e42fe44f38835711a9be97c8a
+run_name: Run_1_n15_sz10
+run_uuid: 8302103e42fe44f38835711a9be97c8a
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1768055034252
+status: 3
+tags: []
+user_id: david

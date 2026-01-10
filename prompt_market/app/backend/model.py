@@ -13,7 +13,7 @@ class TopicModelClassifier:
     A wrapper class for the BERTopic model that provides hybrid classification capabilities.
     
     It combines the unsupervised ML model with a rule-based keyword override system
-    to ensure high precision for specific business categories.
+    to ensure high precision for specific business categories (HR Insights).
     """
 
     def __init__(self):
@@ -22,81 +22,88 @@ class TopicModelClassifier:
         Does not load the heavy model into memory until load_model() is called.
         """
         self.model = None
-        # FIX: Use absolute path relative to this file, not the command line CWD
-        # This ensures tests run from root can still find the model in app/backend/
+        # Use absolute path relative to this file to find the model artifact
         self.model_path = Path(__file__).parent / "bertopic_model.pkl"
         
-        # Business Label Mapping (Used for looking up topic IDs directly)
-        self.business_categories = {
-            "linux_terminal_code_php": "Coding & Development",
-            "essay_write_title_article": "Content Creation",
-            "act_interviewer_position_candidate": "Career & Roleplay",
-            "translate_english_sentence_language": "Language & Translation",
-            "story_character_plot_write": "Creative Writing",
-            "seo_keywords_content_article": "Marketing & SEO",
-            "excel_formula_sheet_data": "Productivity & Tools",
-            "math_solve_equation_step": "Education & Academic",
-            "mental_health_advice_life": "Health & Lifestyle",
-            "socrates_philosophy_ethics": "Philosophy & Logic"
-        }
-        self.default_label = "General AI Assistant"
+        self.default_label = "General Work Task"
 
-        # Keyword Overrides for Hybrid Classification
+        # ---------------------------------------------------------
+        # STRATEGY: EMPLOYEE INSIGHT ENGINE (8 KEY CATEGORIES)
+        # ---------------------------------------------------------
         self.keyword_overrides = {
-            "Coding & Development": [
-                "python", "javascript", "code", "script", "function", "css", "html", "java ", 
-                "c++", "sql", "api", "bug", "linux", "terminal", "bash", "git", "regex", "json"
+            # 1. TECHNICAL SKILLS (For Developers & Engineers - Skill Gap Analysis)
+            "Technical & Coding": [
+                "python", "javascript", "code", "script", "function", "java ", "c++", 
+                "sql", "api", "bug", "terminal", "bash", "git", "regex", "json",
+                "docker", "kubernetes", "deploy", "stack trace", "debug"
             ],
-            "Content Creation": [
-                "essay", "blog", "article", "summary", "title", "outline", "draft", 
-                "cover letter", "email", "rewrite", "paraphrase", "copywriting", "text"
+            
+            # 2. HR & EMPLOYMENT POLICIES (What employees ask about their job/contract)
+            "HR & Employment Policies": [
+                "holiday", "vacation", "leave", "sick day", "benefits", "insurance",
+                "promotion", "hiring", "onboarding", "interview", "salary", "bonus",
+                "career path", "resignation", "notice period", "work from home", "remote",
+                "paternity", "maternity", "contract"
             ],
-            "Marketing & SEO": [
-                "seo", "marketing", "ad copy", "social media", "instagram", "facebook", 
-                "twitter", "linkedin", "keyword", "audience", "brand"
+            
+            # 3. EMPLOYEE WELLBEING (CRITICAL - Signals for HR Intervention)
+            "Employee Wellbeing (Flagged)": [
+                "burnout", "stress", "tired", "overwhelmed", "anxiety", "mental health",
+                "doctor", "therapist", "motivation", "conflict", "harassment",
+                "unhappy", "quit", "toxic", "workload", "exhausted", "depression"
             ],
-            "Creative Writing": [
-                "story", "poem", "song", "lyrics", "haiku", "script", "plot", "character", 
-                "novel", "fiction", "screenplay", "narrative", "rhyme"
+            
+            # 4. IT SUPPORT & INFRASTRUCTURE (Internal technical issues)
+            "IT Support & Infrastructure": [
+                "wifi", "vpn", "password", "login", "cant access", "printer", "laptop",
+                "screen", "mouse", "keyboard", "broken", "install", "update", "connection",
+                "server down", "access denied", "2fa", "authentication"
             ],
-            "Roleplay & Persona": [
-                "act as", "pretend", "you are a", "simulate", "roleplay", "interviewer", 
-                "candidate", "consultant", "expert", "therapist"
+
+            # 5. LEGAL & COMPLIANCE (Corporate Governance queries)
+            "Legal & Compliance": [
+                "nda", "gdpr", "policy", "regulation", "law", "legal",
+                "compliance", "audit", "agreement", "term sheet", "intellectual property",
+                "privacy", "data protection"
             ],
-            "Language & Translation": [
-                "translate", "english", "spanish", "french", "german", "japanese", 
-                "language", "grammar", "correct", "proofread", "vocabulary"
+
+            # 6. FINANCE & BUDGETING (Admin & Expensing)
+            "Finance & Budgeting": [
+                "invoice", "budget", "cost", "expense", "tax", "vat", "price", 
+                "quote", "billing", "payment", "reimbursement", "receipt", "po number"
             ],
-            "Productivity & Tools": [
-                "excel", "spreadsheet", "formula", "csv", "schedule", "plan", "organize", 
-                "list", "table", "format", "meeting"
+
+            # 7. LEARNING & DEVELOPMENT (Upskilling trends)
+            "Learning & Development": [
+                "how to", "tutorial", "explain", "learn", "course", "training", 
+                "certification", "study", "what is", "basics of", "best practice",
+                "guide", "manual", "documentation"
             ],
-            "Education & Academic": [
-                "teach", "explain", "student", "math", "physics", "history", "science", 
-                "homework", "tutor", "quiz", "test", "learn"
-            ],
-            "Health & Lifestyle": [
-                "diet", "food", "workout", "exercise", "recipe", "meal plan", "mental health", 
-                "nutrition", "gym", "advice", "motivation"
-            ],
-            "Philosophy & Logic": [
-                "socrates", "philosophy", "ethics", "logic", "stoic", "reason", "argument", 
-                "debate", "fallacy", "critical thinking"
+
+            # 8. COMMUNICATION & TRANSLATION (General productivity tools)
+            "Communication & Translation": [
+                "translate", "english", "german", "french", "spanish", "proofread",
+                "grammar", "rewrite", "email", "draft", "summary", "paraphrase",
+                "spell check", "tone", "formal", "presentation", "slide", "excel", "spreadsheet"
             ]
+        }
+        
+        # Fallback mapping from BERTopic IDs (if model is used directly)
+        self.business_categories = {
+             0: "General Assistance",
+             1: "Technical Support",
+             2: "Content Generation"
         }
 
     def load_model(self) -> None:
         """
         Loads the BERTopic artifact and the SentenceTransformer embedding model from disk.
-        
-        Raises:
-            Exception: Logs error if model file is missing or corrupt.
         """
         try:
             if self.model_path.exists():
                 logger.info(f"Loading model from {self.model_path}")
-                # Explicitly load embedding model to avoid "No embedding model found" error
-                embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
+                # We use 'all-mpnet-base-v2' to match the training script configuration
+                embedding_model = SentenceTransformer("all-mpnet-base-v2") 
                 self.model = BERTopic.load(str(self.model_path), embedding_model=embedding_model)
                 logger.info("Model loaded successfully.")
             else:
@@ -107,12 +114,6 @@ class TopicModelClassifier:
     def _map_topic_to_business_label(self, topic_id: int) -> str:
         """
         Maps an internal BERTopic integer ID to a human-readable business category.
-
-        Args:
-            topic_id (int): The cluster ID returned by BERTopic.
-
-        Returns:
-            str: The mapped business category or a cleaned version of the topic name.
         """
         if topic_id == -1:
             return "Uncategorized / Noise"
@@ -120,45 +121,43 @@ class TopicModelClassifier:
         if not self.model:
             return self.default_label
         
-        info = self.model.get_topic_info(topic_id)
-        if info.empty:
-            return self.default_label
-            
-        topic_name = info['Name'].values[0]
-        clean_name = topic_name.lower()
+        # 1. Manual mapping (if defined)
+        if topic_id in self.business_categories:
+            return self.business_categories[topic_id]
+
+        # 2. Get info from model
+        try:
+            info = self.model.get_topic_info(topic_id)
+            if info.empty:
+                return self.default_label
+            topic_name = info['Name'].values[0]
+            clean_name = topic_name.lower()
+        except:
+            return f"Topic {topic_id}"
         
-        # 1. Try to match keywords in the Topic Name itself
+        # 3. Try to match keywords in the Topic Name itself
         for category, keywords in self.keyword_overrides.items():
-            topic_keywords = clean_name.split('_')
-            if any(k in topic_keywords for k in keywords) or any(k in clean_name for k in keywords):
+            if any(k in clean_name for k in keywords):
                 return category
 
-        # 2. Handle generic "junk" topic names
-        if any(x in clean_name for x in ['request', 'provide', 'need', 'help', 'ask', 'assistant']):
-            return "General AI Assistance"
-            
-        # 3. Fallback
-        readable_name = ", ".join(clean_name.split('_')[1:4])
-        return f"Topic: {readable_name}"
+        # 4. Fallback: Return a clean version of the topic words
+        parts = clean_name.split('_')
+        if len(parts) > 1:
+            return f"Topic: {', '.join(parts[1:4])}"
+        
+        return f"Topic {topic_id}"
 
     def predict(self, text: str) -> Dict[str, Any]:
         """
-        Predicts the topic for a given input text using a hybrid approach.
-
-        Args:
-            text (str): The user prompt to classify.
-
-        Returns:
-            dict: Contains topic_id, topic_label, topic_words, and topic_prob.
+        Predicts the topic using Hybrid approach (Rules > Model).
         
-        Raises:
-            ValueError: If the model has not been loaded yet.
+        Steps:
+        1. Run ML Model to get base prediction.
+        2. Run Keyword Override to force specific categories if keywords are present.
         """
         if not self.model:
             raise ValueError("Model not initialized")
         
-        # FIX: Handle empty or whitespace-only strings immediately
-        # This prevents the model from running transform() on empty input
         if not text or not text.strip():
              return {
                 "topic_id": -1,
@@ -167,38 +166,35 @@ class TopicModelClassifier:
                 "topic_prob": 0.0
              }
 
-        # 1. Standard ML Prediction
+        # --- STEP 1: Standard ML Prediction ---
         topics, probs = self.model.transform([text])
         topic_id = topics[0]
         
         confidence = 0.0
         if probs is not None:
             if isinstance(probs, np.ndarray) and probs.size > 0:
-                if probs.ndim >= 2:
-                    confidence = float(np.max(probs[0]))
-                elif probs.ndim == 1:
-                    confidence = float(np.max(probs))
-                else:
-                    confidence = float(probs.item())
+                # Handle potential variations in probability output shape
+                confidence = float(np.max(probs))
 
         topic_words = []
         if self.model and topic_id != -1:
             try:
                 topic_data = self.model.get_topic(topic_id)
-                if isinstance(topic_data, list) and topic_data:
-                    topic_words = [word[0] for word in topic_data]
+                if isinstance(topic_data, (list, tuple)) and topic_data:
+                    topic_words = [word[0] for word in topic_data if isinstance(word, (list, tuple)) and len(word) > 0]
             except Exception:
-                topic_words = []
+                pass
         
-        ml_label = self._map_topic_to_business_label(topic_id)
-        final_label = ml_label
+        # Get default label from ML
+        final_label = self._map_topic_to_business_label(topic_id)
 
-        # 2. KEYWORD OVERRIDE
+        # --- STEP 2: KEYWORD OVERRIDE (The Hybrid Logic) ---
+        # If a keyword is found, we override the ML label and boost confidence.
         text_lower = text.lower()
         for category, keywords in self.keyword_overrides.items():
             if any(kw in text_lower for kw in keywords):
                 final_label = category
-                confidence = max(confidence, 0.95) 
+                confidence = max(confidence, 0.95) # High confidence for rule-based matches
                 break
         
         return {
