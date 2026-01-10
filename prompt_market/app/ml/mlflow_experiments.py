@@ -48,10 +48,10 @@ def run_experiments():
     # Rationale: Varying n_neighbors affects local vs global structure in UMAP.
     # Varying min_cluster_size affects how granular the topics are.
     experiments = [
-        {"umap_neighbors": 15, "min_cluster_size": 5, "embedding": "all-MiniLM-L6-v2"},
-        {"umap_neighbors": 15, "min_cluster_size": 10, "embedding": "all-MiniLM-L6-v2"}, # Likely balanced
-        {"umap_neighbors": 5,  "min_cluster_size": 5,  "embedding": "all-MiniLM-L6-v2"}, # Local focus
-        {"umap_neighbors": 30, "min_cluster_size": 15, "embedding": "all-MiniLM-L6-v2"}, # Global focus
+        {"umap_neighbors": 15, "min_cluster_size": 5, "embedding": "all-mpnet-base-v2"},  # Finer topics
+        {"umap_neighbors": 15, "min_cluster_size": 10, "embedding": "all-mpnet-base-v2"}, # Likely balanced
+        {"umap_neighbors": 5,  "min_cluster_size": 5,  "embedding": "all-mpnet-base-v2"}, # Local focus
+        {"umap_neighbors": 30, "min_cluster_size": 15, "embedding": "all-mpnet-base-v2"}, # Global focus
     ]
 
     for i, params in enumerate(experiments):
