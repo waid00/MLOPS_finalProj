@@ -8,25 +8,63 @@ This project implements an internal MLOps solution designed to analyze anonymize
 
 ## A. ML Problem Framing
 
-**Business Goal:** Monitor and categorize internal Generative AI usage to identify actionable insights regarding employee well-being, workload challenges, and professional needs.
+This section defines the alignment between strategic business objectives and the technical machine learning implementation for the Employee Insight Engine.
 
-**ML Problem:** Unsupervised Semantic Clustering (Topic Modeling) combined with a Rule-Based Hybrid System for specific flag detection.
+### 1. Business Goal
+The primary objective is to monitor and categorize internal Generative AI interactions to identify actionable insights regarding **employee well-being, workload challenges, and professional development needs**. By analyzing how employees utilize AI, the organization can proactively detect signs of burnout, identify emerging skill gaps, and optimize internal support systems.
 
-**Metrics:**
-- **Business:** Actionable Insight Rate (percentage of topics leading to HR intervention) and Employee Satisfaction Score (correlated trends).
-- **ML:** Topic Coherence, Outlier Ratio, and Cluster Purity.
+### 2. ML Problem Statement
+The business goal is translated into an **Unsupervised Semantic Clustering (Topic Modeling)** problem. Because standard unsupervised models may miss critical but low-frequency signals (like specific mental health triggers), we implemented a **Hybrid System**. This combines the semantic flexibility of BERTopic with a deterministic **Rule-Based Layer** (Keyword Overrides) to ensure high-priority categories are flagged with 100% recall.
 
-**Stakeholders:** HR Department (Wellness officers), Team Leads, and Internal Operations.
+### 3. Success Metrics
+To evaluate the effectiveness of the solution, we track two distinct sets of metrics:
+
+* **Business Metrics:**
+    * **Actionable Insight Rate:** The percentage of identified topics that lead to a specific HR intervention (e.g., a new training workshop or wellness initiative).
+    * **Departmental Trend Correlation:** The degree to which AI usage patterns correlate with existing Employee Satisfaction Scores (eNPS).
+* **ML Metrics:**
+    * **Topic Coherence:** Measuring the semantic similarity between high-scoring words within a topic to ensure they are human-interpretable.
+    * **Outlier Ratio:** The percentage of documents not assigned to any cluster. We aim for a balance where noise is filtered without losing significant minority trends.
+    * **Cluster Purity:** Evaluated through manual spot-checks of representative documents within each assigned business category.
+
+### 4. Stakeholders
+The solution is designed for a diverse group of internal stakeholders:
+* **HR Department (Wellness Officers):** Primary users of the dashboard to monitor burnout signals and mental health trends.
+* **Team Leads:** To understand the technical hurdles and skill gaps their teams are facing based on AI assistance requests.
+* **Internal Operations:** To identify which corporate policies or tools require clearer documentation based on the volume of employee queries.
 
 ---
 
 ## B. Data Processing Decisions
 
-- **Anonymization (Conceptual):** In a real deployment, PII (Personally Identifiable Information) would be stripped. For this prototype, we treat the dataset as pre-anonymized logs.
-- **Deduplication:** Removed exact text matches to prevent frequency bias from automated scripts.
-- **Length Filtering:** Removed prompts < 4 words to filter out casual chat noise ("Hi", "Thanks").
-- **Preprocessing:** Lowercasing and whitespace normalization. We maintained full sentence structures to allow the model to capture the intent and emotion behind the prompt, not just keywords.
-- **Stopword Removal:** Added custom stopwords (e.g., "chatgpt", "write") to focus on the subject of the request (e.g., "burnout", "python error", "deadline").
+This section documents the systematic approach taken to transform raw prompt logs into high-quality input for the BERTopic model. Every decision was made to balance semantic richness with noise reduction.
+
+### 1. Anonymization & Privacy (Conceptual)
+* **What we did:** Treated the dataset as pre-anonymized logs, assuming all Personally Identifiable Information (PII) has been stripped.
+* **Why:** In an HR context, employee trust is paramount. Analyzing intent is valuable; tracking individuals is a liability.
+* **Impact:** Ensures the project remains compliant with conceptual GDPR/Privacy policies, focusing on aggregate trends rather than individual surveillance.
+
+### 2. Deduplication
+* **What we did:** Removed exact text matches from the dataset.
+* **Why:** Automated scripts or "copy-paste" behavior across departments can create a frequency bias, making a specific topic seem more prevalent than it actually is.
+* **Alternatives considered:** Keeping duplicates but weighting them lower. We rejected this because it adds unnecessary complexity to unsupervised clustering.
+* **Impact:** A more balanced topic distribution where unique employee intents carry equal weight.
+
+### 3. Length Filtering (Threshold: < 4 words)
+* **What we did:** Filtered out any prompts containing fewer than four words.
+* **Why:** Very short inputs like "Hi," "Thanks," or "Help me" lack enough semantic context for the embedding model to categorize them accurately. They represent "casual noise."
+* **Impact:** Significantly reduced the *Outlier Ratio* and prevented the creation of meaningless "Chatter" clusters.
+
+### 4. Semantic Preprocessing (Normalization)
+* **What we did:** Applied lowercasing and whitespace normalization while intentionally preserving full sentence structures.
+* **Why:** Unlike traditional Bag-of-Words models, our `all-mpnet-base-v2` transformer model relies on the order and context of words to capture intent and emotion (e.g., frustration vs. curiosity).
+* **Alternatives considered:** Lemmatization or Stemming. We rejected these because they often strip away the nuanced "tone" of employee communication.
+* **Impact:** Improved the model's ability to distinguish between a technical request and a well-being signal.
+
+### 5. Custom Stopword Removal
+* **What we did:** In addition to standard English stopwords, we removed domain-specific noise such as "chatgpt", "ai", "write", "make", and "prompt".
+* **Why:** These words appear in almost every interaction with GenAI but do not contribute to the *topic* of the interaction (e.g., "Write a python script" should focus on "python", not "write").
+* **Impact:** Cleaner topic representations in the final dashboard, ensuring that HR Managers see actionable subjects (e.g., "Python Troubleshooting") instead of generic verbs.
 
 ---
 
@@ -124,12 +162,25 @@ With more time and resources, we would propose the following optimizations:
 
 ## E. Deployment Architecture
 
-### System Components
+This section documents the containerization strategy and system structure used to ensure reproducibility and scalability within the MLOps lifecycle.
 
-- **Streamlit Frontend:** Dashboard for HR Managers to view trends and topic distributions.
-- **FastAPI Backend:** Processes logs in real-time and serves predictions.
-- **Docker Compose:** Ensures secure and isolated deployment within the company intranet.
+### 1. Design Decisions: Multi-Container Architecture
+The application is built using a **multi-container architecture** orchestrated via **Docker Compose**. 
 
-![Architecture Diagram](assets/architecture.png)
+* **Why this approach?** By separating the Frontend (Streamlit) and the Backend (FastAPI) into isolated containers, we achieve a clean separation of concerns. This allows the backend to handle heavy ML computations while the frontend remains responsive for the end-user.
+* **Design Trade-offs:**
+    * **Pros:** Improved scalability (we can scale the API independently), higher fault tolerance (a UI crash doesn't affect the model serving), and a cleaner development workflow.
+    * **Cons:** Slightly higher complexity in orchestration, as it requires managing an internal Docker network for inter-container communication.
 
-```
+### 2. Technology Stack & Justification
+Our stack was selected to bridge the gap between complex ML modeling and non-technical business accessibility:
+
+* **FastAPI (Backend):** Chosen for its high performance and native support for asynchronous operations. It serves our `TopicModelClassifier` and provides an automated Swagger (OpenAPI) documentation interface.
+* **Streamlit (Frontend):** Selected to meet the requirement for a non-technical user interface. It allows HR Managers to visualize trends and test inputs without any Python knowledge.
+* **Inference Engine:** A hybrid architecture combining state-of-the-art `BERTopic` (using `Sentence-Transformers`) with a deterministic rule-based layer for high-precision business categories.
+* **Docker Compose:** Acts as the primary orchestrator, ensuring that the entire environment—including all dependencies, ports (8000 for API, 8501 for UI), and network links—is provisioned with a single command.
+
+### 3. Architecture Diagram
+The following diagram illustrates the system's data flow: The user interacts with the Streamlit Dashboard -> The dashboard sends a REST request to the FastAPI Backend -> The backend processes the text using the serialized `bertopic_model.pkl` and returns the identified category and confidence score.
+
+![Architecture Diagram](assets/architecture.jpeg)
