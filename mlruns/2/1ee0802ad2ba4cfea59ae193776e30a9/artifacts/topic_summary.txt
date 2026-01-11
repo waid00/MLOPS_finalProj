@@ -1,0 +1,11 @@
+   Topic  Count                                    Name
+0     -1     68      -1_image_background_lighting_style
+1      0    680                  0_act_user_use_provide
+2      1     56             1_visible_true_face_natural
+3      2     37     2_realistic_natural_cinematic_light
+4      3     28               3_style_lighting_red_dark
+5      4     24      4_subject_lighting_cinematic_image
+6      5     22            5_city_parchment_ink_weather
+7      6     21           6_slightly_turkish_small_efes
+8      7     20  7_sponsors_project_write_sponsors page
+9      8     15       8_ingredients_recipes_food_recipe

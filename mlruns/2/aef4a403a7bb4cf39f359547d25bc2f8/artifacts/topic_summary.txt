@@ -1,0 +1,16 @@
+    Topic  Count                                     Name
+0      -1    145       -1_user_severity_professional_data
+1       0     29        0_academic_research_writing_topic
+2       1     20        1_product_marketing_brand_content
+3       2     17             2_man_red_photography_medium
+4       3     17                   3_ve_ile_güvenlik_veya
+5       4     16               4_prompt_prompts_llm_guess
+6       5     16          5_market_stock_trading_analysis
+7       6     14          6_code_review_feedback_security
+8       7     14         7_edge_management_device_backend
+9       8     12  8_type commands_terminal_commands_reply
+10      9     12         9_city_weather_miniature_magical
+11     10     12       10_ingredients_recipes_recipe_food
+12     11     12           11_react_dashboard_frontend_js
+13     12     12                     12_bug_bugs_fix_code
+14     13     11         13_ou_targetou_disabled_accounts
