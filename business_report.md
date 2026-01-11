@@ -175,7 +175,7 @@ We systematically explored the parameter space to ensure we capture meaningful e
 
 ### Experimentation Evidence
 
-Below are screenshots from our MLflow dashboard demonstrating the iterative process:
+Below are screenshots from our MLflow that demonstrate our individual runs (experiments) and proof of our existing artifacts:
 
 ![mlflow table](assets/mlflow_table.png)
 
