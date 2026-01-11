@@ -81,7 +81,7 @@ We utilized **MLflow** to conduct a systematic grid search of hyperparameters. B
 * **Cluster Density (HDBSCAN):** Evaluated `min_cluster_size` and `min_samples` to control the granularity of topics. 
 * **Noise Filtering:** Tracked the `outlier_ratio` to ensure we weren't losing significant minority signals while maintaining cluster purity. 
 
-> **[INSERT SCREENSHOT HERE: MLflow Table showing the 10+ runs conducted]**
+![model graph](assets/graph_model.png)
 > 
 > *Figure 1: Systematic parameter exploration tracked via MLflow.*
 
@@ -140,10 +140,6 @@ We documented several configurations that failed to meet business requirements t
 * **Failure Cause:** The model was too strict, labeling nearly half of the employee interactions as "Noise."
 * **Learning:** For a useful HR dashboard, it is better to assign prompts to their "nearest neighbor" topic than to leave them uncategorized.
 
-> **[INSERT SCREENSHOT HERE: MLflow comparison of Failed vs. Target runs]**
-> 
-> *Figure 2: Performance metrics highlighting the rejection of extreme configurations.*
-
 ---
 
 We utilized **BERTopic** with the following final configuration:
@@ -181,11 +177,11 @@ We systematically explored the parameter space to ensure we capture meaningful e
 
 Below are screenshots from our MLflow dashboard demonstrating the iterative process:
 
-> [INSERT SCREENSHOT 1 HERE: MLflow Table]
+![mlflow table](assets/mlflow_table.png)
 
 **Figure 1:** Comparison of model runs to optimize topic granularity.
 
-> [INSERT SCREENSHOT 2 HERE: MLflow Artifacts]
+![mlflow_artifacts](assets/mlflow_artifacts.png)
 
 **Figure 2:** Validation of model artifacts saved during the training pipeline.
 
