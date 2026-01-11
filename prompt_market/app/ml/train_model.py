@@ -90,8 +90,8 @@ def train_and_save(
     )
 
     hdbscan_model = HDBSCAN(
-        min_cluster_size=7,
-        min_samples=2,      # <-- VYLEPŠENÍ: Snižuje počet outliers (-1)
+        min_cluster_size=10,
+        min_samples=2,
         metric='euclidean', 
         cluster_selection_method='eom', 
         prediction_data=True
