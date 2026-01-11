@@ -1,139 +1,110 @@
 # Employee Insight Engine (GenAI Log Analytics)
 
-An internal MLOps solution designed to analyze anonymized employee interactions with Generative AI tools. By applying unsupervised topic modeling (BERTopic), this tool uncovers workforce trends, detects stress signals (e.g., "burnout", "health"), and identifies skill gaps to help HR and Management provide targeted support.
-
----
-
-## Architecture
-
-The application follows a microservices architecture using Docker containers:
-
-- **Frontend (Streamlit):** An interactive dashboard for HR managers to visualize topic trends and test manual inputs.
-
-- **Backend (FastAPI):** A REST API that hosts the trained BERTopic model and handles inference requests.
-
-- **ML Pipeline:** Offline training scripts that process data, train the model, and track experiments via MLflow.
+An internal MLOps stack that classifies anonymized employee GenAI prompts into actionable categories. The stack combines BERTopic with keyword overrides to flag coding requests, HR policy questions, wellbeing signals, and more, so HR/IT can react to trends rather than individuals.
 
 ![Architecture Diagram](assets/architecture.jpeg)
 
 ---
 
-## Quick Start (Docker)
+## Components
 
-The easiest way to run the application is using Docker Compose. This handles all dependencies automatically.
-
-### Navigate to the project directory:
-
-```bash
-cd prompt_market
-```
-
-### Build and Run:
-
-```bash
-docker-compose up --build
-```
-
-### Access the App:
-
-- **Frontend (HR Dashboard):** http://localhost:8501
-
-- **Backend API Docs:** http://localhost:8000/docs
-
-- **MLflow UI:** http://localhost:5000 (if running experiments)
+- **Backend API (FastAPI):** [prompt_market/app/backend/main.py](prompt_market/app/backend/main.py) loads a BERTopic artifact and exposes `/health` and `/predict`. Hybrid logic in [prompt_market/app/backend/model.py](prompt_market/app/backend/model.py) applies keyword overrides when confidence is low or critical phrases appear.
+- **Frontend (Streamlit):** [prompt_market/app/frontend/streamlit_app.py](prompt_market/app/frontend/streamlit_app.py) offers single-prompt testing, CSV batch upload, and known failure demos. Uses `BACKEND_URL` (defaults to `http://localhost:8000/predict`).
+- **ML Pipeline:** Data cleaning in [prompt_market/app/ml/data_processing.py](prompt_market/app/ml/data_processing.py), training in [prompt_market/app/ml/train_model.py](prompt_market/app/ml/train_model.py), topic evaluation in [prompt_market/app/ml/evaluate_topics.py](prompt_market/app/ml/evaluate_topics.py), and hyperparameter sweeps logged to MLflow in [prompt_market/app/ml/mlflow_experiments.py](prompt_market/app/ml/mlflow_experiments.py). Training pulls prompts from Hugging Face `hf://datasets/fka/awesome-chatgpt-prompts/prompts.csv`.
+- **Artifacts:** Default model saved to [prompt_market/app/backend/bertopic_model.pkl](prompt_market/app/backend/bertopic_model.pkl); labeled training data cached at [prompt_market/app/backend/labeled_data.csv](prompt_market/app/backend/labeled_data.csv). MLflow runs live under [prompt_market/mlruns](prompt_market/mlruns).
 
 ---
 
-## Local Development & Training
+## Quick Start (Docker Compose)
 
-If you need to retrain the model or run tests locally without Docker.
-
-### 1. Prerequisites
-
-- Python 3.10+
-
-- Virtual Environment (Recommended)
-
-### 2. Installation
+From the repo root:
 
 ```bash
 cd prompt_market
-# Create virtual env
+docker-compose up --build
+```
+
+Access points:
+- Frontend dashboard: http://localhost:8501
+- Backend docs: http://localhost:8000/docs
+
+Docker mounts the model file so you can replace `app/backend/bertopic_model.pkl` without rebuilding.
+
+---
+
+## Local Development
+
+### Setup
+```bash
+# From repo root
 python -m venv .venv
-# Activate (Windows)
-.venv\Scripts\activate
-# Activate (Mac/Linux)
-source .venv/bin/activate
-
-# Install dependencies
+.venv\Scripts\activate  # Windows
+# source .venv/bin/activate  # macOS/Linux
 pip install -r requirements.txt
+cd prompt_market
 ```
 
-### 3. Training the Model
+### Run services locally
+- Backend: `uvicorn app.backend.main:app --reload --host 0.0.0.0 --port 8000`
+- Frontend: `BACKEND_URL=http://localhost:8000/predict streamlit run app/frontend/streamlit_app.py`
 
-To generate a new bertopic_model.pkl artifact based on the latest data:
-
-```bash
-python app/ml/train_model.py
-```
-
-**Note for Windows Users:** The script includes a specialized patch to handle PyTorch c10.dll loading issues.
-
-### 4. Running MLflow Experiments
-
-To explore hyperparameters (n_neighbors, min_cluster_size) and visualize metrics:
-
-```bash
-python app/ml/mlflow_experiments.py
-mlflow ui
-```
-
-### 5. Evaluating the Model
-
-To verify the generated topics and outlier ratios:
-
-```bash
-python app/ml/evaluate_topics.py
-```
-
-### 6. Running Tests
-
-To validate the hybrid rule-based system and API endpoints:
-
+### Tests
 ```bash
 pytest app/tests/test_app.py
 ```
 
 ---
 
-## Key Features
+## Training and Evaluation
 
-- **Hybrid Classification:** Combines state-of-the-art BERTopic (semantic clustering) with deterministic rules (keyword overrides) for critical categories like Coding or Creative Writing.
+- Train a fresh BERTopic model (saves artifact and labeled CSV):
+	```bash
+	python app/ml/train_model.py \
+		--model-path app/backend/bertopic_model.pkl \
+		--data-path app/backend/labeled_data.csv
+	```
 
-- **Privacy-First:** Designed to analyze aggregated trends rather than individual surveillance.
+- Evaluate topics and top words:
+	```bash
+	python app/ml/evaluate_topics.py
+	```
 
-- **Robustness:** Handles edge cases (empty inputs, short prompts) via extensive error handling and Uncategorized labeling.
+- Hyperparameter sweeps with MLflow logging:
+	```bash
+	python app/ml/mlflow_experiments.py
+	mlflow ui  # view results (default http://localhost:5000)
+	```
 
-- **Windows Compatibility:** Includes custom patches for PyTorch DLL initialization on Windows environments.
+Windows users: the training, evaluation, and test scripts pre-load `c10.dll` to avoid PyTorch load errors; no manual steps needed.
 
 ---
 
-## Project Structure
+## API Reference
+
+- `GET /health` → `{ "status": "healthy", "model_loaded": true }`
+- `POST /predict` → send `{ "text": "Write a python script..." }` and receive `{ "topic_id": int, "topic_label": str, "topic_words": [str], "topic_prob": float }`. Empty or short inputs return `Uncategorized / Noise`.
+
+---
+
+## Frontend Workflows
+
+- **Single Prompt:** Enter text and see category, confidence, topic id, and top keywords.
+- **Batch CSV:** Upload a CSV with column `prompt`; downloads labeled results as `classified_prompts.csv`.
+- **Failure Analysis Demo:** Predefined tricky prompts to observe model limitations and error handling.
+
+---
+
+## Project Structure (key paths)
 
 ```plaintext
 prompt_market/
 ├── app/
-│   ├── backend/          # FastAPI application
-│   │   ├── main.py       # API Endpoints
-│   │   ├── model.py      # Inference Logic (Hybrid System)
-│   │   └── bertopic_model.pkl # Trained Artifact
-│   ├── frontend/         # Streamlit Dashboard
-│   │   └── streamlit_app.py
-│   ├── ml/               # Machine Learning Pipeline
-│   │   ├── train_model.py       # Training Script
-│   │   ├── mlflow_experiments.py # Hyperparameter Tuning
-│   │   └── evaluate_topics.py   # Quality Check
-│   └── tests/            # Pytest Suite
-├── docker-compose.yaml   # Container Orchestration
-└── requirements.txt      # Python Dependencies
+│   ├── backend/        # FastAPI service + model artifact
+│   ├── frontend/       # Streamlit UI
+│   ├── ml/             # Data prep, training, evaluation, MLflow runs
+│   └── tests/          # API tests
+├── docker-compose.yaml # Local orchestration (backend + frontend)
+└── mlruns/             # Experiment tracking outputs
 ```
+
+For business context and modeling decisions, see [business_report.md](business_report.md).
