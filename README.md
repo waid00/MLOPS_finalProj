@@ -2,7 +2,7 @@
 
 An internal MLOps stack that classifies anonymized employee GenAI prompts into actionable categories. The stack combines BERTopic with keyword overrides to flag coding requests, HR policy questions, wellbeing signals, and more, enabling HR/IT teams to react to trends rather than individuals. 
 
-![Architecture Diagram](assets/architecture. jpeg)
+![Architecture Diagram](assets/architecture.jpeg)
 
 ---
 
