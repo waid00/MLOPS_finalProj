@@ -1,10 +1,3 @@
-Tady je kompletní **Business Report** ve formátu Markdown, který kombinuje tvůj dodaný úvod/závěr a mnou vygenerovanou detailní sekci *Failure Analysis*.
-
-Tento text si ulož jako soubor `business_report.md`.
-
----
-
-```markdown
 # End-to-End ML Topic Modeling: Employee Insight Engine
 
 ## Executive Summary
