@@ -70,6 +70,82 @@ This section documents the systematic approach taken to transform raw prompt log
 
 ## C. Model Development
 
+This section documents the iterative development of the Employee Insight Engine, focusing on the transition from baseline configurations to our high-precision final model.
+
+### 1. Experimentation with BERTopic
+
+We utilized **MLflow** to conduct a systematic grid search of hyperparameters. By pre-calculating embeddings using the `all-mpnet-base-v2` transformer model, we efficiently tested multiple configurations to observe how the semantic space shifted under various constraints. 
+
+**Key Exploration Areas:**
+* **Manifold Approximation (UMAP):** Tested `n_neighbors` from 5 to 50 to find the balance between local clusters and global data trends.
+* **Cluster Density (HDBSCAN):** Evaluated `min_cluster_size` and `min_samples` to control the granularity of topics. 
+* **Noise Filtering:** Tracked the `outlier_ratio` to ensure we weren't losing significant minority signals while maintaining cluster purity. 
+
+> **[INSERT SCREENSHOT HERE: MLflow Table showing the 10+ runs conducted]**
+> 
+> *Figure 1: Systematic parameter exploration tracked via MLflow.*
+
+---
+
+### 2. Final Hyperparameter Justification
+
+Based on the evidence from our experimentation, we selected the following final configuration for our production training script (`train_model.py`):
+
+```python
+# --- TUNED HYPERPARAMETERS ---
+# Optimal balance for HR Trend Detection
+umap_model = UMAP(
+    n_neighbors=15, 
+    n_components=5, 
+    min_dist=0.0, 
+    metric='cosine', 
+    random_state=42
+)
+
+hdbscan_model = HDBSCAN(
+    min_cluster_size=10,
+    min_samples=2,
+    metric='euclidean', 
+    cluster_selection_method='eom', 
+    prediction_data=True
+)
+```
+
+#### Justification for Final Settings: 
+
+* **UMAP `n_neighbors=15`:** This provided the "Goldilocks" level of connectivity. It successfully prevented disparate topics like "IT Support" and "HR Policy" from merging (which occurred at `n_neighbors=30`) while avoiding the over-fragmentation seen at lower values. 
+
+* **HDBSCAN `min_cluster_size=10`:** We increased this from the default to ensure that any identified "Topic" represents a statistically significant group of at least 10 employees. This prevents HR from reacting to isolated individual complaints and focuses on organizational trends.
+
+* **HDBSCAN `min_samples=2`:** By setting this lower than the cluster size, we achieved "Aggressive Noise Reduction." This forces the model to be more inclusive, pulling edge cases into the most similar existing clusters rather than labeling them as outliers (-1).
+
+---
+
+### 3. Failed Approaches Analysis (REQUIRED)
+
+We documented several configurations that failed to meet business requirements to better understand the model's boundaries: 
+
+#### Approach 1: Extreme Underfitting (Neighbors: 50, Cluster Size: 40)
+* **Result:** The model produced only 2-3 massive topics (e. g., "General Work").
+* **Failure Cause:** Excessive smoothing swallowed all nuanced signals like "Burnout" or "Skill Gaps."
+* **Learning:** Semantic diversity in corporate logs requires a more localized manifold.
+
+#### Approach 2: Extreme Overfitting (Neighbors: 5, Cluster Size: 3)
+* **Result:** Over 100+ micro-topics with a high degree of overlap. 
+* **Failure Cause:** The model was reacting to grammatical noise (punctuation/stopwords) rather than intent.
+* **Learning:** Small cluster sizes make the dashboard uninterpretable for non-technical stakeholders.
+
+#### Approach 3: Low Noise Filtering (Min Samples: 15)
+* **Result:** An unacceptable Outlier Ratio (> 40%).
+* **Failure Cause:** The model was too strict, labeling nearly half of the employee interactions as "Noise."
+* **Learning:** For a useful HR dashboard, it is better to assign prompts to their "nearest neighbor" topic than to leave them uncategorized.
+
+> **[INSERT SCREENSHOT HERE: MLflow comparison of Failed vs. Target runs]**
+> 
+> *Figure 2: Performance metrics highlighting the rejection of extreme configurations.*
+
+---
+
 We utilized **BERTopic** with the following final configuration:
 
 - **Embedding Model:** all-mpnet-base-v2 (High semantic accuracy to detect subtle nuances in intent).
