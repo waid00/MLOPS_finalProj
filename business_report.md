@@ -197,10 +197,27 @@ The following table documents specific instances where the hybrid model (BERTopi
 
 | Input Prompt | Model Prediction | Root Cause | HR Impact & Mitigation |
 | :--- | :--- | :--- | :--- |
-| **"Fix this."** | *Technical & Coding (Low Confidence)* | **Lack of Context:** The imperative "fix" is strongly correlated with code in training data. However, without an object, it's impossible to determine if it refers to code, a printer, or a process error. | **Threshold Filtering:** The system must ignore predictions with probability < 85%. HR should not be overwhelmed by vague complaints lacking a clear target. |
-| **"Write a poem about flowers in Python style."** | *Technical & Coding* | **Keyword Bias:** The rule-based system detected "Python" and overrode the semantic meaning of the rest of the sentence. The model ignored the creative/leisure intent. | **Finer Segmentation:** Future versions must distinguish "Work-related coding" from "Leisure/Creative tasks". False classification here skews team productivity metrics. |
-| **"I am struggling with the new manager's leadership."** | *General Work Task* | **Semantic Blindness to Sentiment:** The model correctly identified the entity "manager" but failed to capture the negative sentiment and interpersonal conflict belonging to Wellbeing. | **Sentiment Layer:** A parallel sentiment analysis model is required. Topic modeling alone cannot reliably detect frustration without explicit keywords. |
-| **"The server is on fire, help!"** | *Employee Wellbeing (Flagged)* | **Metaphor Misinterpretation:** Keywords "fire" and "help" triggered a crisis scenario for burnout/safety, although it was a technical urgency (IT Incident). | **Contextual Disambiguation:** The model requires training on specific corporate slang to distinguish technical "firefighting" from actual psychological distress. |
+| **"I want you to act as a Linux terminal expert and help me write a bash script that automatically backs up my database every night at midnight using cron jobs."** | *Technical & Coding* (Confidence: 0.95) | **Correct Classification:** Both model and override correctly identified this as technical work. Clear technical keywords (bash, script, database, cron) and explicit task-oriented language provided strong signals. | **High Confidence Validation:** Predictions >0.85 confidence can be auto-accepted.  This represents ideal classifier performance with unambiguous input.  |
+| **"I've been working 70 hour weeks for the past three months and I'm completely burned out. I can't sleep anymore and I'm having panic attacks. I don't know how much longer I can keep doing this."** | *Content Generation* (Confidence: -0.03) | **Critical Failure - Semantic Blindness:** The model completely misclassified a clear crisis scenario as content generation. Negative confidence suggests high uncertainty but wrong category selection.  Missed explicit distress signals:  "burned out," "panic attacks," "can't sleep." | **URGENT:  Safety Net Required:** All predictions with confidence <0.20 must trigger manual review. This false negative could result in untreated mental health crisis. System failed to detect wellbeing emergency despite explicit language. |
+| **"Act as a creative storyteller and help me develop a compelling narrative arc for a science fiction novel about time travelers discovering ancient civilizations."** | *Content Generation* (Confidence: 0.15) | **Correct but Low Confidence:** Model correctly identified creative/leisure task but struggled with "act as" roleplay framing. Low confidence indicates the system detected ambiguity between personal creative work vs. professional content creation. | **Context Disambiguation Needed:** System cannot distinguish personal creative hobbies from work-related content tasks.  Future versions need "work context" detection to separate leisure activities from billable creative work. Low confidence should trigger follow-up question:  "Is this for work or personal use?" |
+| **"The server is on fire, help!"** | *Employee Wellbeing (Flagged)* | **Metaphor Misinterpretation:** Keywords "fire" and "help" triggered a crisis scenario for burnout/safety, although it was a technical urgency (IT Incident). | **Contextual Disambiguation:** The model requires training on corporate slang and technical metaphors to distinguish technical "firefighting" from actual psychological distress or safety emergencies. |
+
+## Summary of Classification Performance Issues
+
+1. **High-Confidence Success** (bash script example): System performs reliably when technical vocabulary and task structure are clear. 
+
+2. **Catastrophic False Negative** (burnout example): The most concerning failure.  Despite explicit mental health crisis language, system defaulted to wrong category with near-zero confidence.  This gap could have severe consequences.
+
+3. **Ambiguous Creative Tasks** (storytelling example): System struggles with "act as" prompts and cannot differentiate work vs. personal creative requests. Low confidence correctly signals uncertainty.
+
+4. **Metaphor Handling** (server fire example): Technical jargon using crisis language causes category confusion between IT incidents and wellbeing emergencies.
+
+## Recommended Improvements
+
+- **Emergency Keyword Triggers:** Hardcode explicit wellbeing escalation for phrases like "panic attacks," "burned out," "can't sleep," "mental health."
+- **Confidence Thresholds:** Auto-route all predictions <0.50 to human review to catch ambiguous or misclassified urgent cases.
+- **Context Clarification:** For "act as" prompts and creative tasks, add follow-up:  "Is this related to your work responsibilities?"
+- **Multi-Model Ensemble:** Run parallel sentiment + intent + entity models; wellbeing classification should trigger if ANY model flags distress. 
 
 ### 2. Root Cause Analysis
 
